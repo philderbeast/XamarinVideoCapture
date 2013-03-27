@@ -248,10 +248,9 @@ type VideoCaptureController(viewColor, title) =
 type AppDelegate() =
     inherit UIApplicationDelegate()
 
-    let window = new UIWindow(UIScreen.MainScreen.Bounds)
-
     override x.FinishedLaunching(app, options) =
         let viewController = new VideoCaptureController(UIColor.Red, "Main")
+        let window = new UIWindow(UIScreen.MainScreen.Bounds)
         window.RootViewController <- viewController
         window.MakeKeyAndVisible()
         true
