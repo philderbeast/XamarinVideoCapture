@@ -22,6 +22,18 @@ module _Private =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
 
+    let makeToggleButton (recordToggle : EventHandler) =
+        let toggleButton = UIButton.FromType (UIButtonType.RoundedRect)
+        toggleButton.SetTitle ("Record", UIControlState.Normal)
+        toggleButton.Frame <-
+            new RectangleF (
+                new PointF (
+                    UIScreen.MainScreen.Bounds.Width / 2.0f - toggleButton.IntrinsicContentSize.Width / 2.0f,
+                    UIScreen.MainScreen.Bounds.Height - toggleButton.IntrinsicContentSize.Height - 50.0f),
+                    toggleButton.IntrinsicContentSize)
+        toggleButton.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
+        toggleButton 
+
 type Failure() =
     static member Alert (msg) =
         let obj = new NSString() :> NSObject
@@ -199,27 +211,18 @@ type ContentView(fillColor, recordToggle : EventHandler) as x =
     inherit UIView()
     do
         x.BackgroundColor <- fillColor
-        let imageView =
-            new UIImageView (
-                new RectangleF (
-                    10.0f, 10.0f, UIScreen.MainScreen.Bounds.Width - 20.0f, UIScreen.MainScreen.Bounds.Height - 120.0f))
-
-        imageView.BackgroundColor <- UIColor.Blue
-
-        let infoLabel = new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
-
-        let toggleButton = UIButton.FromType (UIButtonType.RoundedRect)
-        toggleButton.SetTitle ("Record", UIControlState.Normal)
-        toggleButton.Frame <-
+        let imageBounds =
             new RectangleF (
-                new PointF (
-                    UIScreen.MainScreen.Bounds.Width / 2.0f - toggleButton.IntrinsicContentSize.Width / 2.0f,
-                    UIScreen.MainScreen.Bounds.Height - toggleButton.IntrinsicContentSize.Height - 50.0f),
-                    toggleButton.IntrinsicContentSize)
-        toggleButton.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
-        x.AddSubview (imageView)
-        x.AddSubview (infoLabel)
-        x.AddSubview (toggleButton)
+                10.0f,
+                10.0f,
+                UIScreen.MainScreen.Bounds.Width - 20.0f,
+                UIScreen.MainScreen.Bounds.Height - 120.0f)
+
+        let imageView = new UIImageView (imageBounds, BackgroundColor = UIColor.Blue) :> UIView
+        let infoLabel = new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f)) :> UIView
+        let toggleButton = makeToggleButton (recordToggle) :> UIView
+
+        [imageView; infoLabel; toggleButton] |> List.iter (fun v -> x.AddSubview v)
 
     member val ImageView : UIImageView = null with get, set
     member val InfoLabel : UILabel = null with get, set
