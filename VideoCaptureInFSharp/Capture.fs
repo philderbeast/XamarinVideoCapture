@@ -58,7 +58,7 @@ module _Private =
         pixelBuffer.Unlock(CVOptionFlags.None) |> ignore
         UIImage.FromImage(cgImage)
 
-    let maybeInitializeInputWriter () =
+    let initializeInputWriter () =
         try
             let dictionary =
                 let objects = [|AVVideo.CodecH264; new NSNumber(640); new NSNumber(480)|] : NSObject []
@@ -85,19 +85,19 @@ type VideoCapture(labelledView) =
 
     member x.StartRecording () =
         try
-            x.session <- x.MaybeInitializeSession()
+            x.session <- x.InitializeSession()
             match x.session with
             | None ->
                 Failure.Alert("Couldn't initialize session")
                 false
             | Some(session) ->
-                x.writer <- x.MaybeInitializeAssetWriter()
+                x.writer <- x.InitializeAssetWriter()
                 match x.writer with
                 | None ->
                     Failure.Alert("Couldn't initialize writer")
                     false
                 | Some(writer) ->
-                    x.inputWriter <- maybeInitializeInputWriter()
+                    x.inputWriter <- initializeInputWriter()
                     match x.inputWriter with
                     | None ->
                         Failure.Alert("Couldn't initialize input writer")
@@ -123,7 +123,7 @@ type VideoCapture(labelledView) =
         with
             | e -> Failure.Alert(e.Message)
 
-    member x.MaybeInitializeSession () =
+    member x.InitializeSession () =
         //Create the capture session
         let session = new AVCaptureSession(SessionPreset = AVCaptureSession.PresetMedium)
 
@@ -149,7 +149,7 @@ type VideoCapture(labelledView) =
                 session.AddOutput(output)
                 Some(session)
 
-    member x.MaybeInitializeAssetWriter () =
+    member x.InitializeAssetWriter () =
         let filePath =
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
