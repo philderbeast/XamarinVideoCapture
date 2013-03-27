@@ -218,11 +218,12 @@ type ContentView(fillColor, recordToggle : EventHandler) as x =
                 UIScreen.MainScreen.Bounds.Width - 20.0f,
                 UIScreen.MainScreen.Bounds.Height - 120.0f)
 
-        let imageView = new UIImageView (imageBounds, BackgroundColor = UIColor.Blue) :> UIView
-        let infoLabel = new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f)) :> UIView
-        let toggleButton = makeToggleButton (recordToggle) :> UIView
-
-        [imageView; infoLabel; toggleButton] |> List.iter (fun v -> x.AddSubview v)
+        [
+            new UIImageView (imageBounds, BackgroundColor = UIColor.Blue) :> UIView
+            new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f)) :> UIView
+            makeToggleButton (recordToggle) :> UIView
+        ]
+        |> List.iter (fun v -> x.AddSubview v)
 
     member val ImageView : UIImageView = null with get, set
     member val InfoLabel : UILabel = null with get, set
