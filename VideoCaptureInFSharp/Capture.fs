@@ -40,11 +40,10 @@ type Failure() =
         let alert = new UIAlertView("Trouble", msg, null, "OK", null)
         new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
 
-type VideoCapture(imgView, label) = 
-    inherit AVCaptureVideoDataOutputSampleBufferDelegate()
+type LabelledView = {Label : UILabel; View : UIImageView}
 
-    member val ImageView : UIImageView = null with get, set
-    member val InfoLabel : UILabel = null with get, set
+type VideoCapture(labelledView) = 
+    inherit AVCaptureVideoDataOutputSampleBufferDelegate()
 
     member val session : Option<AVCaptureSession> = None with get, set
     member val writer : Option<AVAssetWriter> = None with get, set
@@ -155,7 +154,8 @@ type VideoCapture(imgView, label) =
         lib.WriteVideoToSavedPhotosAlbum(
             x.videoUrl,
             new ALAssetsLibraryWriteCompletionDelegate((fun _ _ ->
-                x.InfoLabel.BeginInvokeOnMainThread((fun () -> x.InfoLabel.Text <- "Movie saved to Album.")))))
+                labelledView.Label.BeginInvokeOnMainThread((fun () ->
+                    labelledView.Label.Text <- "Movie saved to Album.")))))
 
     member x.DidOutputSampleBuffer (captureOutput, sampleBuffer : CMSampleBuffer, connection) =
         try
@@ -168,11 +168,11 @@ type VideoCapture(imgView, label) =
                     w.StartSessionAtSourceTime(x.lastSampleTime)
                     x.frame <- 1
                 | _, _, Some(iw) ->
-                    x.ImageView.BeginInvokeOnMainThread((fun () ->
+                    labelledView.View.BeginInvokeOnMainThread((fun () ->
                         let image = x.ImageFromSampleBuffer(sampleBuffer)
-                        x.ImageView.Image <- image))
+                        labelledView.View.Image <- image))
 
-                    x.InfoLabel.BeginInvokeOnMainThread((fun () ->
+                    labelledView.Label.BeginInvokeOnMainThread((fun () ->
                         let infoString =
                             if iw.ReadyForMoreMediaData then
                                 if not (iw.AppendSampleBuffer(sampleBuffer)) then
@@ -182,7 +182,7 @@ type VideoCapture(imgView, label) =
                             else
                                 "Writer not ready";
 
-                        x.InfoLabel.Text <- infoString))
+                        labelledView.Label.Text <- infoString))
                 | _ -> ()
             with
                 | e -> Failure.Alert(e.Message)
@@ -209,32 +209,36 @@ type VideoCapture(imgView, label) =
 
 type ContentView(fillColor, recordToggle : EventHandler) as x =
     inherit UIView()
-    do
-        x.BackgroundColor <- fillColor
+
+    let labelledView =
         let imageBounds =
             new RectangleF (
                 10.0f,
                 10.0f,
                 UIScreen.MainScreen.Bounds.Width - 20.0f,
                 UIScreen.MainScreen.Bounds.Height - 120.0f)
+        {
+            Label = new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
+            View = new UIImageView (imageBounds, BackgroundColor = UIColor.Blue)
+        }
 
+    do
+        x.BackgroundColor <- fillColor
         [
-            new UIImageView (imageBounds, BackgroundColor = UIColor.Blue) :> UIView
-            new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f)) :> UIView
+            labelledView.View :> UIView
+            labelledView.Label :> UIView
             makeToggleButton (recordToggle) :> UIView
         ]
         |> List.iter (fun v -> x.AddSubview v)
 
-    member val ImageView : UIImageView = null with get, set
-    member val InfoLabel : UILabel = null with get, set
+    member val LabelledView = labelledView
 
-        
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
 
     let cv = base.View :?> ContentView
     member val recording = false with get, set
-    member val videoCapture : VideoCapture = new VideoCapture(cv.ImageView, cv.InfoLabel) with get, set
+    member val videoCapture : VideoCapture = new VideoCapture(cv.LabelledView) with get, set
 
     override x.DidReceiveMemoryWarning () =
         base.DidReceiveMemoryWarning()
@@ -246,7 +250,7 @@ type VideoCaptureController(viewColor, title) =
 
     member x.RecordToggle (sender : obj, e : EventArgs) =
         if not x.recording then
-            x.videoCapture <- new VideoCapture(cv.ImageView, cv.InfoLabel)
+            x.videoCapture <- new VideoCapture(cv.LabelledView)
             x.recording <- x.videoCapture.StartRecording()
         else
             x.videoCapture.StopRecording()
