@@ -159,20 +159,18 @@ type VideoCapture(imgView, label) =
                         w.StartSessionAtSourceTime(x.lastSampleTime)
                         x.frame <- 1
                     | _, _, Some(iw) ->
-                        let mutable infoString = ""
-                        if iw.ReadyForMoreMediaData then
-                            if not (iw.AppendSampleBuffer(sampleBuffer)) then
-                                infoString <- "Failed to append sample buffer"
+                        let infoString =
+                            if iw.ReadyForMoreMediaData then
+                                if not (iw.AppendSampleBuffer(sampleBuffer)) then
+                                    "Failed to append sample buffer"
+                                else
+                                    String.Format("{0} frames captured", (x.frame + 1))
                             else
-                                infoString <- String.Format("{0} frames captured", (x.frame + 1))
-                        else
-                            infoString <- "Writer not ready";
+                                "Writer not ready";
 
                         let image = x.ImageFromSampleBuffer(sampleBuffer)
                         x.ImageView.BeginInvokeOnMainThread((fun () -> x.ImageView.Image <- image))
-                        let closingInfoString = infoString
-
-                        x.InfoLabel.BeginInvokeOnMainThread((fun () -> x.InfoLabel.Text <- closingInfoString))
+                        x.InfoLabel.BeginInvokeOnMainThread((fun () -> x.InfoLabel.Text <- infoString))
                     | _ -> ()
                 with
                     | e -> Failure.Alert(e.Message)
