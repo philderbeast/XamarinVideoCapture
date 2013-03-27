@@ -23,6 +23,13 @@ type Failure() =
         let alert = new UIAlertView("Trouble", msg, null, "OK", null)
         new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
 
+type Recording =
+    {
+        Session : AVCaptureSession option
+        Writer : AVAssetWriter option
+        InputWriter : AVAssetWriterInput option
+    }
+
 [<AutoOpen>]
 module _Private =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
@@ -71,52 +78,53 @@ module _Private =
         with
             | e -> Failure.Alert(e.Message); None
 
+    let startRecording
+        (initSession : unit -> AVCaptureSession option) 
+        (initWriter : unit -> AVAssetWriter option)
+        (initInputWriter : unit -> AVAssetWriterInput option) =
+        try
+            match initSession() with
+            | None -> Choice2Of2("Couldn't initialize session")
+            | Some(session : AVCaptureSession) ->
+                match initWriter() with
+                | None -> Choice2Of2("Couldn't initialize writer")
+                | Some(writer : AVAssetWriter) ->
+                    match initInputWriter() with
+                    | None -> Choice2Of2("Couldn't initialize input writer")
+                    | Some(inputWriter) ->
+                        if not (writer.CanAddInput(inputWriter)) then
+                            Choice2Of2("Couldn't add input writer to writer")
+                        else
+                            writer.AddInput(inputWriter)
+                            session.StartRunning()
+                            Choice1Of2(
+                                {
+                                    Session = Some(session)
+                                    Writer = Some(writer)
+                                    InputWriter = Some(inputWriter)
+                                })
+        with
+            | e -> Choice2Of2(e.Message)
+
 type LabelledView = {Label : UILabel; View : UIImageView}
 
 type VideoCapture(labelledView) = 
     inherit AVCaptureVideoDataOutputSampleBufferDelegate()
 
-    member val session : Option<AVCaptureSession> = None with get, set
-    member val writer : Option<AVAssetWriter> = None with get, set
-    member val inputWriter : Option<AVAssetWriterInput> = None with get, set
+    member val recording = {Session = None; Writer = None; InputWriter = None} with get, set
     member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
     member val videoUrl : NSUrl = null with get, set
     member val frame = 0 with get, set
 
     member x.StartRecording () =
-        try
-            x.session <- x.InitializeSession()
-            match x.session with
-            | None ->
-                Failure.Alert("Couldn't initialize session")
-                false
-            | Some(session) ->
-                x.writer <- x.InitializeAssetWriter()
-                match x.writer with
-                | None ->
-                    Failure.Alert("Couldn't initialize writer")
-                    false
-                | Some(writer) ->
-                    x.inputWriter <- initializeInputWriter()
-                    match x.inputWriter with
-                    | None ->
-                        Failure.Alert("Couldn't initialize input writer")
-                        false
-                    | Some(inputWriter) ->
-                        if not (writer.CanAddInput(inputWriter)) then
-                            Failure.Alert("Couldn't add input writer to writer")
-                            false
-                        else
-                            writer.AddInput(inputWriter)
-                            session.StartRunning()
-                            true
-        with
-            | e -> Failure.Alert(e.Message); false
+        match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
+        | Choice1Of2(r) -> x.recording <- r; true
+        | Choice2Of2(m) -> Failure.Alert(m); false
 
     member x.StopRecording () =
         try
-            match x.session, x.writer with
-            | Some(session), Some(writer) ->
+            match x.recording with
+            | {Session = Some(session); Writer = Some(writer); InputWriter = Some(_)} ->
                 session.StopRunning()
                 writer.FinishWriting(new NSAction(fun () -> x.MoveFinishedMovieToAlbum()))
             | _ -> ()
@@ -180,7 +188,7 @@ type VideoCapture(labelledView) =
             try
                 x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
 
-                match x.frame, x.writer, x.inputWriter with
+                match x.frame, x.recording.Writer, x.recording.InputWriter with
                 | 0, Some(w), _ ->
                     w.StartWriting() |> ignore
                     w.StartSessionAtSourceTime(x.lastSampleTime)
