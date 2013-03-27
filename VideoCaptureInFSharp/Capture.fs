@@ -17,6 +17,12 @@ open System.Threading
 open MonoTouch.AssetsLibrary
 open System.IO
 
+type Failure() =
+    static member Alert (msg) =
+        let obj = new NSString() :> NSObject
+        let alert = new UIAlertView("Trouble", msg, null, "OK", null)
+        new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
+
 [<AutoOpen>]
 module _Private =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
@@ -34,11 +40,36 @@ module _Private =
         toggleButton.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
         toggleButton 
 
-type Failure() =
-    static member Alert (msg) =
-        let obj = new NSString() :> NSObject
-        let alert = new UIAlertView("Trouble", msg, null, "OK", null)
-        new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
+    let imageFromSampleBuffer (sampleBuffer : CMSampleBuffer) =
+        // Get the CoreVideo image
+        use pixelBuffer = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
+        // Lock the base address
+        pixelBuffer.Lock(CVOptionFlags.None) |> ignore
+        // Get the number of bytes per row for the pixel buffer
+        let baseAddress = pixelBuffer.BaseAddress
+        let bytesPerRow = pixelBuffer.BytesPerRow
+        let width = pixelBuffer.Width
+        let height = pixelBuffer.Height
+        let flags = CGBitmapFlags.PremultipliedFirst ||| CGBitmapFlags.ByteOrder32Little
+        // Create a CGImage on the RGB colorspace from the configured parameter above
+        use cs = CGColorSpace.CreateDeviceRGB()
+        use context = new CGBitmapContext(baseAddress, width, height, 8, bytesPerRow, cs, flags)
+        use cgImage = context.ToImage()
+        pixelBuffer.Unlock(CVOptionFlags.None) |> ignore
+        UIImage.FromImage(cgImage)
+
+    let maybeInitializeInputWriter () =
+        try
+            let dictionary =
+                let objects = [|AVVideo.CodecH264; new NSNumber(640); new NSNumber(480)|] : NSObject []
+                let keys = [|AVVideo.CodecKey; AVVideo.WidthKey; AVVideo.HeightKey|] : NSObject []
+                NSDictionary.FromObjectsAndKeys(objects, keys)
+
+            let writerInput = new AVAssetWriterInput(!> AVMediaType.Video, dictionary)
+            writerInput.ExpectsMediaDataInRealTime <- true
+            Some(writerInput)
+        with
+            | e -> Failure.Alert(e.Message); None
 
 type LabelledView = {Label : UILabel; View : UIImageView}
 
@@ -66,7 +97,7 @@ type VideoCapture(labelledView) =
                     Failure.Alert("Couldn't initialize writer")
                     false
                 | Some(writer) ->
-                    x.inputWriter <- x.MaybeInitializeInputWriter()
+                    x.inputWriter <- maybeInitializeInputWriter()
                     match x.inputWriter with
                     | None ->
                         Failure.Alert("Couldn't initialize input writer")
@@ -136,19 +167,6 @@ type VideoCapture(labelledView) =
         else
             Some(writer)
 
-    member __.MaybeInitializeInputWriter () =
-        try
-            let dictionary =
-                let objects = [|AVVideo.CodecH264; new NSNumber(640); new NSNumber(480)|] : NSObject []
-                let keys = [|AVVideo.CodecKey; AVVideo.WidthKey; AVVideo.HeightKey|] : NSObject []
-                NSDictionary.FromObjectsAndKeys(objects, keys)
-
-            let writerInput = new AVAssetWriterInput(!> AVMediaType.Video, dictionary)
-            writerInput.ExpectsMediaDataInRealTime <- true
-            Some(writerInput)
-        with
-            | e -> Failure.Alert(e.Message); None
-
     member x.MoveFinishedMovieToAlbum () =
         let lib = new ALAssetsLibrary()
         lib.WriteVideoToSavedPhotosAlbum(
@@ -170,7 +188,7 @@ type VideoCapture(labelledView) =
                 | _, _, Some(iw) ->
                     match labelledView with
                     | {Label = l; View = v} ->
-                        v.BeginInvokeOnMainThread((fun () -> v.Image <- x.ImageFromSampleBuffer(sampleBuffer)))
+                        v.BeginInvokeOnMainThread((fun () -> v.Image <- imageFromSampleBuffer(sampleBuffer)))
 
                         l.BeginInvokeOnMainThread((fun () ->
                             let infoString =
@@ -188,24 +206,6 @@ type VideoCapture(labelledView) =
                 | e -> Failure.Alert(e.Message)
         finally
             sampleBuffer.Dispose()
-
-    member __.ImageFromSampleBuffer (sampleBuffer : CMSampleBuffer) : UIImage =
-        // Get the CoreVideo image
-        use pixelBuffer = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
-        // Lock the base address
-        pixelBuffer.Lock(CVOptionFlags.None) |> ignore
-        // Get the number of bytes per row for the pixel buffer
-        let baseAddress = pixelBuffer.BaseAddress
-        let bytesPerRow = pixelBuffer.BytesPerRow
-        let width = pixelBuffer.Width
-        let height = pixelBuffer.Height
-        let flags = CGBitmapFlags.PremultipliedFirst ||| CGBitmapFlags.ByteOrder32Little
-        // Create a CGImage on the RGB colorspace from the configured parameter above
-        use cs = CGColorSpace.CreateDeviceRGB()
-        use context = new CGBitmapContext(baseAddress, width, height, 8, bytesPerRow, cs, flags)
-        use cgImage = context.ToImage()
-        pixelBuffer.Unlock(CVOptionFlags.None) |> ignore
-        UIImage.FromImage(cgImage)
 
 type ContentView(fillColor, recordToggle : EventHandler) as x =
     inherit UIView()
