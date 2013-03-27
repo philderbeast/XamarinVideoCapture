@@ -34,9 +34,9 @@ type VideoCapture(imgView, label) =
     member val ImageView : UIImageView = null with get, set
     member val InfoLabel : UILabel = null with get, set
 
-    member val session : AVCaptureSession = null with get, set
-    member val writer : AVAssetWriter = null with get, set
-    member val inputWriter : AVAssetWriterInput = null with get, set
+    member val session : Option<AVCaptureSession> = None with get, set
+    member val writer : Option<AVAssetWriter> = None with get, set
+    member val inputWriter : Option<AVAssetWriterInput> = None with get, set
     member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
     member val videoUrl : NSUrl = null with get, set
     member val frame = 0 with get, set
@@ -44,38 +44,44 @@ type VideoCapture(imgView, label) =
     member x.StartRecording () =
         try
             x.session <- x.MaybeInitializeSession()
-            if x.session = null then
+            match x.session with
+            | None ->
                 Failure.Alert("Couldn't initialize session")
                 false
-            else
+            | Some(session) ->
                 x.writer <- x.MaybeInitializeAssetWriter()
-                if x.writer = null then
+                match x.writer with
+                | None ->
                     Failure.Alert("Couldn't initialize writer")
                     false
-                else
+                | Some(writer) ->
                     x.inputWriter <- x.MaybeInitializeInputWriter()
-                    if x.inputWriter = null then
+                    match x.inputWriter with
+                    | None ->
                         Failure.Alert("Couldn't initialize input writer")
                         false
-                    else
-                        if not (x.writer.CanAddInput(x.inputWriter)) then
+                    | Some(inputWriter) ->
+                        if not (writer.CanAddInput(inputWriter)) then
                             Failure.Alert("Couldn't add input writer to writer")
                             false
                         else
-                            x.writer.AddInput(x.inputWriter)
-                            x.session.StartRunning()
+                            writer.AddInput(inputWriter)
+                            session.StartRunning()
                             true
         with
             | e -> Failure.Alert(e.Message); false
 
     member x.StopRecording () =
         try
-            x.session.StopRunning()
-            x.writer.FinishWriting(new NSAction(fun () -> x.MoveFinishedMovieToAlbum()))
+            match x.session, x.writer with
+            | Some(session), Some(writer) ->
+                session.StopRunning()
+                writer.FinishWriting(new NSAction(fun () -> x.MoveFinishedMovieToAlbum()))
+            | _ -> ()
         with
             | e -> Failure.Alert(e.Message)
 
-    member x.MaybeInitializeSession () : AVCaptureSession =
+    member x.MaybeInitializeSession () =
         //Create the capture session
         let session = new AVCaptureSession(SessionPreset = AVCaptureSession.PresetMedium)
 
@@ -83,12 +89,12 @@ type VideoCapture(imgView, label) =
         let captureDevice = AVCaptureDevice.DefaultDeviceWithMediaType(!> AVMediaType.Video)
         if captureDevice = null then
             Failure.Alert("No captureDevice - this won't work on the simulator, try a physical device")
-            null
+            None
         else
             let input = AVCaptureDeviceInput.FromDevice(captureDevice)
             if input = null then
                 Failure.Alert("No input - this won't work on the simulator, try a physical device")
-                null
+                None
             else
                 session.AddInput(input)
 
@@ -99,9 +105,9 @@ type VideoCapture(imgView, label) =
                 let queue = new MonoTouch.CoreFoundation.DispatchQueue("myQueue")
                 output.SetSampleBufferDelegate(x, queue)
                 session.AddOutput(output)
-                session
+                Some(session)
 
-    member x.MaybeInitializeAssetWriter () : AVAssetWriter =
+    member x.MaybeInitializeAssetWriter () =
         let filePath =
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -115,11 +121,11 @@ type VideoCapture(imgView, label) =
         let writer = new AVAssetWriter(x.videoUrl, !> AVFileType.QuickTimeMovie, error)
         if error.Value <> null then
             Failure.Alert(error.Value.LocalizedDescription)
-            null
+            None
         else
-            writer
+            Some(writer)
 
-    member x.MaybeInitializeInputWriter () : AVAssetWriterInput =
+    member x.MaybeInitializeInputWriter () =
         try
             let dictionary =
                 let objects = [|AVVideo.CodecH264; new NSNumber(640); new NSNumber(480)|] : NSObject []
@@ -128,9 +134,9 @@ type VideoCapture(imgView, label) =
 
             let writerInput = new AVAssetWriterInput(!> AVMediaType.Video, dictionary)
             writerInput.ExpectsMediaDataInRealTime <- true
-            writerInput
+            Some(writerInput)
         with
-            | e -> Failure.Alert(e.Message); null
+            | e -> Failure.Alert(e.Message); None
 
     member x.MoveFinishedMovieToAlbum () =
         let lib = new ALAssetsLibrary()
@@ -146,25 +152,28 @@ type VideoCapture(imgView, label) =
             try
                 try
                     x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
-                    let image = x.ImageFromSampleBuffer(sampleBuffer)
 
-                    if x.frame = 0 then
-                        x.writer.StartWriting() |> ignore
-                        x.writer.StartSessionAtSourceTime(x.lastSampleTime)
+                    match x.frame, x.writer, x.inputWriter with
+                    | 0, Some(w), _ ->
+                        w.StartWriting() |> ignore
+                        w.StartSessionAtSourceTime(x.lastSampleTime)
                         x.frame <- 1
-                    else
+                    | _, _, Some(iw) ->
                         let mutable infoString = ""
-                        if x.inputWriter.ReadyForMoreMediaData then
-                            if not (x.inputWriter.AppendSampleBuffer(sampleBuffer)) then
+                        if iw.ReadyForMoreMediaData then
+                            if not (iw.AppendSampleBuffer(sampleBuffer)) then
                                 infoString <- "Failed to append sample buffer"
                             else
                                 infoString <- String.Format("{0} frames captured", (x.frame + 1))
                         else
                             infoString <- "Writer not ready";
 
-                        let closingInfoString = infoString
+                        let image = x.ImageFromSampleBuffer(sampleBuffer)
                         x.ImageView.BeginInvokeOnMainThread((fun () -> x.ImageView.Image <- image))
+                        let closingInfoString = infoString
+
                         x.InfoLabel.BeginInvokeOnMainThread((fun () -> x.InfoLabel.Text <- closingInfoString))
+                    | _ -> ()
                 with
                     | e -> Failure.Alert(e.Message)
             finally
