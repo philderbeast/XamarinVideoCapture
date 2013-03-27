@@ -170,9 +170,7 @@ type VideoCapture(labelledView) =
                 | _, _, Some(iw) ->
                     match labelledView with
                     | {Label = l; View = v} ->
-                        v.BeginInvokeOnMainThread((fun () ->
-                            let image = x.ImageFromSampleBuffer(sampleBuffer)
-                            v.Image <- image))
+                        v.BeginInvokeOnMainThread((fun () -> v.Image <- x.ImageFromSampleBuffer(sampleBuffer)))
 
                         l.BeginInvokeOnMainThread((fun () ->
                             let infoString =
