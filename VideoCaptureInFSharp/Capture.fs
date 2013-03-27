@@ -25,9 +25,9 @@ type Failure() =
 
 type Recording =
     {
-        Session : AVCaptureSession option
-        Writer : AVAssetWriter option
-        InputWriter : AVAssetWriterInput option
+        Session : AVCaptureSession
+        Writer : AVAssetWriter
+        InputWriter : AVAssetWriterInput
     }
 
 [<AutoOpen>]
@@ -99,9 +99,9 @@ module _Private =
                             session.StartRunning()
                             Choice1Of2(
                                 {
-                                    Session = Some(session)
-                                    Writer = Some(writer)
-                                    InputWriter = Some(inputWriter)
+                                    Session = session
+                                    Writer = writer
+                                    InputWriter = inputWriter
                                 })
         with
             | e -> Choice2Of2(e.Message)
@@ -111,20 +111,20 @@ type LabelledView = {Label : UILabel; View : UIImageView}
 type VideoCapture(labelledView) = 
     inherit AVCaptureVideoDataOutputSampleBufferDelegate()
 
-    member val recording = {Session = None; Writer = None; InputWriter = None} with get, set
+    member val recording : Recording option = None with get, set
     member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
     member val videoUrl : NSUrl = null with get, set
     member val frame = 0 with get, set
 
     member x.StartRecording () =
         match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
-        | Choice1Of2(r) -> x.recording <- r; true
-        | Choice2Of2(m) -> Failure.Alert(m); false
+        | Choice1Of2(r) -> x.recording <- Some(r); true
+        | Choice2Of2(m) -> x.recording <- None; Failure.Alert(m); false
 
     member x.StopRecording () =
         try
             match x.recording with
-            | {Session = Some(session); Writer = Some(writer); InputWriter = Some(_)} ->
+            | Some({Session = session; Writer = writer; InputWriter = _}) ->
                 session.StopRunning()
                 writer.FinishWriting(new NSAction(fun () -> x.MoveFinishedMovieToAlbum()))
             | _ -> ()
@@ -188,12 +188,12 @@ type VideoCapture(labelledView) =
             try
                 x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
 
-                match x.frame, x.recording.Writer, x.recording.InputWriter with
-                | 0, Some(w), _ ->
+                match x.frame, x.recording with
+                | 0, Some({Session = _; Writer = w; InputWriter = _}) ->
                     w.StartWriting() |> ignore
                     w.StartSessionAtSourceTime(x.lastSampleTime)
                     x.frame <- 1
-                | _, _, Some(iw) ->
+                | _, Some({Session = _; Writer = _; InputWriter = iw}) ->
                     match labelledView with
                     | {Label = l; View = v} ->
                         v.BeginInvokeOnMainThread((fun () -> v.Image <- imageFromSampleBuffer(sampleBuffer)))
