@@ -125,7 +125,7 @@ type VideoCapture(imgView, label) =
         else
             Some(writer)
 
-    member x.MaybeInitializeInputWriter () =
+    member __.MaybeInitializeInputWriter () =
         try
             let dictionary =
                 let objects = [|AVVideo.CodecH264; new NSNumber(640); new NSNumber(480)|] : NSObject []
@@ -145,42 +145,39 @@ type VideoCapture(imgView, label) =
             new ALAssetsLibraryWriteCompletionDelegate((fun _ _ ->
                 x.InfoLabel.BeginInvokeOnMainThread((fun () -> x.InfoLabel.Text <- "Movie saved to Album.")))))
 
-        member x.DidOutputSampleBuffer (
-            captureOutput,
-            sampleBuffer : CMSampleBuffer,
-            connection) =
+    member x.DidOutputSampleBuffer (captureOutput, sampleBuffer : CMSampleBuffer, connection) =
+        try
             try
-                try
-                    x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
+                x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
 
-                    match x.frame, x.writer, x.inputWriter with
-                    | 0, Some(w), _ ->
-                        w.StartWriting() |> ignore
-                        w.StartSessionAtSourceTime(x.lastSampleTime)
-                        x.frame <- 1
-                    | _, _, Some(iw) ->
-                        x.ImageView.BeginInvokeOnMainThread((fun () ->
-                            let image = x.ImageFromSampleBuffer(sampleBuffer)
-                            x.ImageView.Image <- image))
+                match x.frame, x.writer, x.inputWriter with
+                | 0, Some(w), _ ->
+                    w.StartWriting() |> ignore
+                    w.StartSessionAtSourceTime(x.lastSampleTime)
+                    x.frame <- 1
+                | _, _, Some(iw) ->
+                    x.ImageView.BeginInvokeOnMainThread((fun () ->
+                        let image = x.ImageFromSampleBuffer(sampleBuffer)
+                        x.ImageView.Image <- image))
 
-                        x.InfoLabel.BeginInvokeOnMainThread((fun () ->
-                            let infoString =
-                                if iw.ReadyForMoreMediaData then
-                                    if not (iw.AppendSampleBuffer(sampleBuffer)) then
-                                        "Failed to append sample buffer"
-                                    else
-                                        String.Format("{0} frames captured", (x.frame + 1))
+                    x.InfoLabel.BeginInvokeOnMainThread((fun () ->
+                        let infoString =
+                            if iw.ReadyForMoreMediaData then
+                                if not (iw.AppendSampleBuffer(sampleBuffer)) then
+                                    "Failed to append sample buffer"
                                 else
-                                    "Writer not ready";
+                                    String.Format("{0} frames captured", (x.frame + 1))
+                            else
+                                "Writer not ready";
 
-                            x.InfoLabel.Text <- infoString))
-                    | _ -> ()
-                with
-                    | e -> Failure.Alert(e.Message)
-            finally
-                sampleBuffer.Dispose()
+                        x.InfoLabel.Text <- infoString))
+                | _ -> ()
+            with
+                | e -> Failure.Alert(e.Message)
+        finally
+            sampleBuffer.Dispose()
 
-    member x.ImageFromSampleBuffer (sampleBuffer : CMSampleBuffer) : UIImage =
+    member __.ImageFromSampleBuffer (sampleBuffer : CMSampleBuffer) : UIImage =
         // Get the CoreVideo image
         use pixelBuffer = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
         // Lock the base address
@@ -258,7 +255,7 @@ type VideoCaptureController(viewColor, title) =
 type AppDelegate() =
     inherit UIApplicationDelegate()
 
-    override x.FinishedLaunching(app, options) =
+    override __.FinishedLaunching(app, options) =
         let viewController = new VideoCaptureController(UIColor.Red, "Main")
         let window = new UIWindow(UIScreen.MainScreen.Bounds)
         window.RootViewController <- viewController
