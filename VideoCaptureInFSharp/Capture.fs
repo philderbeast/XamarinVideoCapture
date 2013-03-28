@@ -36,7 +36,7 @@ module _Private =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
 
-    let makeToggleButton (recordToggle : EventHandler) =
+    let makeToggleButton recordToggle =
         let tb = UIButton.FromType (UIButtonType.RoundedRect)
         tb.SetTitle ("Record", UIControlState.Normal)
         let bds = UIScreen.MainScreen.Bounds
@@ -47,7 +47,7 @@ module _Private =
                     bds.Width / 2.0f - sz.Width / 2.0f,
                     bds.Height - sz.Height - 50.0f),
                     sz)
-        tb.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
+        tb.TouchUpInside.Add (fun _ -> recordToggle tb)
         tb 
 
     let imageFromSampleBuffer (sampleBuffer : CMSampleBuffer) =
@@ -214,7 +214,7 @@ type VideoCapture(labelledView) =
         finally
             sampleBuffer.Dispose()
 
-type ContentView(fillColor, recordToggle : EventHandler) as x =
+type ContentView(fillColor, recordToggle) as x =
     inherit UIView()
 
     let lv =
@@ -256,9 +256,9 @@ type VideoCaptureController(viewColor, title) =
     override x.ViewDidLoad() =
         base.ViewDidLoad()
         x.Title <- title
-        x.View <- new ContentView(viewColor, (new EventHandler((fun o e -> x.RecordToggle(o, e)))))
+        x.View <- new ContentView(viewColor, (fun o -> x.RecordToggle(o)))
 
-    member x.RecordToggle (sender : obj, e : EventArgs) =
+    member x.RecordToggle (sender : UIButton) =
         let getLabelledView =
             match base.View with
             | :? ContentView as cv -> (fun () -> cv.LabelledView)
@@ -266,7 +266,7 @@ type VideoCaptureController(viewColor, title) =
 
         x.recordingCapture <- x.recordingCapture.Toggle getLabelledView
         let newTitle = if x.recordingCapture.IsRecording then "Stop" else "Record"
-        (sender :?> UIButton).SetTitle(newTitle, UIControlState.Normal)
+        sender.SetTitle(newTitle, UIControlState.Normal)
 
 [<Register("AppDelegate")>]
 type AppDelegate() =
