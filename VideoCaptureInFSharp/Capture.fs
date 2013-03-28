@@ -253,9 +253,6 @@ type VideoCaptureController(viewColor, title) =
     member val recording = false with get, set
     member val videoCapture : VideoCapture = new VideoCapture(cv.LabelledView) with get, set
 
-    override x.DidReceiveMemoryWarning () =
-        base.DidReceiveMemoryWarning()
-
     override x.ViewDidLoad() =
         base.ViewDidLoad()
         x.Title <- title
