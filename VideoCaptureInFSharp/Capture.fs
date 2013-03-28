@@ -221,11 +221,7 @@ type ContentView(fillColor, recordToggle) as x =
 
     do
         x.BackgroundColor <- fillColor
-        [
-            lv.View :> UIView
-            lv.Label :> UIView
-            makeToggleButton (recordToggle) :> UIView
-        ]
+        ([lv.View; lv.Label; makeToggleButton recordToggle] : UIView list)
         |> List.iter (fun v -> x.AddSubview v)
 
     member val LabelledView = lv
