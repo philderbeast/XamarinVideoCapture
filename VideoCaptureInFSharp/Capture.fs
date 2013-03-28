@@ -25,6 +25,7 @@ type Failure() =
 
 type Recording =
     {
+        VideoUrl : NSUrl
         Session : AVCaptureSession
         Writer : AVAssetWriter
         InputWriter : AVAssetWriterInput
@@ -112,7 +113,7 @@ module _Private =
 
     let startRecording
         (initSession : unit -> AVCaptureSession option) 
-        (initWriter : unit -> AVAssetWriter option)
+        (initWriter : unit -> (NSUrl * AVAssetWriter) option)
         (initInputWriter : unit -> AVAssetWriterInput option) =
         try
             match initSession() with
@@ -120,7 +121,7 @@ module _Private =
             | Some(session : AVCaptureSession) ->
                 match initWriter() with
                 | None -> Choice2Of2("Couldn't initialize writer")
-                | Some(writer : AVAssetWriter) ->
+                | Some(url, writer : AVAssetWriter) ->
                     match initInputWriter() with
                     | None -> Choice2Of2("Couldn't initialize input writer")
                     | Some(inputWriter) ->
@@ -131,6 +132,7 @@ module _Private =
                             session.StartRunning()
                             Choice1Of2(
                                 {
+                                    VideoUrl = url
                                     Session = session
                                     Writer = writer
                                     InputWriter = inputWriter
@@ -150,7 +152,6 @@ type VideoCapture(labelledView) =
 
     member val recording : Recording option = None with get, set
     member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
-    member val videoUrl : NSUrl option = None with get, set
     member val frame = 0 with get, set
 
     member x.StartRecording () =
@@ -170,12 +171,12 @@ type VideoCapture(labelledView) =
 
     member x.InitializeAssetWriter () =
         match initializeAssetWriter() with
-        | Choice1Of2(u, w) -> x.videoUrl <- Some(u); Some(w)
-        | Choice2Of2(m) -> Failure.Alert(m); x.videoUrl <- None; None
+        | Choice1Of2(u, w) -> Some(u, w)
+        | Choice2Of2(m) -> Failure.Alert(m); None
 
     member x.MoveFinishedMovieToAlbum () =
-        match x.videoUrl, labelledView with
-        | Some(url), {Label = l; View = _} ->
+        match x.recording, labelledView with
+        | Some({VideoUrl = url; Session = _; Writer = _; InputWriter = _}), {Label = l; View = _} ->
             (new ALAssetsLibrary()).WriteVideoToSavedPhotosAlbum(
                 url,
                 new ALAssetsLibraryWriteCompletionDelegate((fun _ _ ->
