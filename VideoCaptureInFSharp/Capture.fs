@@ -92,10 +92,8 @@ module _Private =
         let session = new AVCaptureSession(SessionPreset = AVCaptureSession.PresetMedium)
 
         //Setup the video capture
-        let captureDevice = AVCaptureDevice.DefaultDeviceWithMediaType(!> AVMediaType.Video)
-        if captureDevice = null then
-            Choice2Of2("No captureDevice - this won't work on the simulator, try a physical device")
-        else
+        match AVCaptureDevice.DefaultDeviceWithMediaType(!> AVMediaType.Video) with
+        | captureDevice when captureDevice <> null ->
             let input = AVCaptureDeviceInput.FromDevice(captureDevice)
             if input = null then
                 Choice2Of2("No input - this won't work on the simulator, try a physical device")
@@ -110,6 +108,7 @@ module _Private =
                 output.SetSampleBufferDelegate(f, queue)
                 session.AddOutput(output)
                 Choice1Of2(session)
+        | _ -> Choice2Of2("No captureDevice - this won't work on the simulator, try a physical device")
 
     let startRecording
         (initSession : unit -> AVCaptureSession option) 
