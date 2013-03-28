@@ -149,9 +149,7 @@ type LabelledView = {Label : UILabel; View : UIImageView}
 
 type VideoCapture(labelledView) = 
     inherit AVCaptureVideoDataOutputSampleBufferDelegate()
-
     let frame = ref 0
-
     member val recording : Recording option = None with get, set
 
     member x.StartRecording () =
@@ -258,7 +256,6 @@ type VideoCapturing =
 
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
-
     member val recordingCapture = {Capture = None; IsRecording = false} with get, set
 
     override x.ViewDidLoad() =
