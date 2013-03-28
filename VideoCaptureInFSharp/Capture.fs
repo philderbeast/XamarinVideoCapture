@@ -176,9 +176,9 @@ type VideoCapture(labelledView) =
         | Some({VideoUrl = url; Session = _; Writer = _; InputWriter = _}), {Label = l; View = _} ->
             (new ALAssetsLibrary()).WriteVideoToSavedPhotosAlbum(
                 url,
-                new ALAssetsLibraryWriteCompletionDelegate((fun _ _ ->
-                    l.BeginInvokeOnMainThread((fun () ->
-                        l.Text <- "Movie saved to Album.")))))
+                new ALAssetsLibraryWriteCompletionDelegate(fun _ _ ->
+                    l.BeginInvokeOnMainThread(fun () ->
+                        l.Text <- "Movie saved to Album.")))
         | None, _ -> ()
 
     member x.DidOutputSampleBuffer (captureOutput, sampleBuffer : CMSampleBuffer, connection) =
@@ -194,9 +194,9 @@ type VideoCapture(labelledView) =
                 | _, Some({Session = _; Writer = _; InputWriter = iw}) ->
                     match labelledView with
                     | {Label = l; View = v} ->
-                        v.BeginInvokeOnMainThread((fun () -> v.Image <- imageFromSampleBuffer(sampleBuffer)))
+                        v.BeginInvokeOnMainThread(fun () -> v.Image <- imageFromSampleBuffer(sampleBuffer))
 
-                        l.BeginInvokeOnMainThread((fun () ->
+                        l.BeginInvokeOnMainThread(fun () ->
                             let infoString =
                                 if iw.ReadyForMoreMediaData then
                                     if not (iw.AppendSampleBuffer(sampleBuffer)) then
@@ -207,7 +207,7 @@ type VideoCapture(labelledView) =
                                 else
                                     "Writer not ready"
 
-                            l.Text <- infoString))
+                            l.Text <- infoString)
                 | _ -> ()
             with
                 | e -> Failure.Alert(e.Message)
@@ -256,17 +256,16 @@ type VideoCaptureController(viewColor, title) =
     override x.ViewDidLoad() =
         base.ViewDidLoad()
         x.Title <- title
-        x.View <- new ContentView(viewColor, (fun o -> x.RecordToggle(o)))
+        x.View <- new ContentView(viewColor, fun uib -> x.RecordToggle(fun s -> uib.SetTitle(s, UIControlState.Normal)))
 
-    member x.RecordToggle (sender : UIButton) =
+    member x.RecordToggle (titleSetter : string -> unit) =
         let getLabelledView =
             match base.View with
-            | :? ContentView as cv -> (fun () -> cv.LabelledView)
+            | :? ContentView as cv -> fun () -> cv.LabelledView
             | _ -> failwith "Base class is not a ContentView"
 
         x.recordingCapture <- x.recordingCapture.Toggle getLabelledView
-        let newTitle = if x.recordingCapture.IsRecording then "Stop" else "Record"
-        sender.SetTitle(newTitle, UIControlState.Normal)
+        titleSetter <| if x.recordingCapture.IsRecording then "Stop" else "Record"
 
 [<Register("AppDelegate")>]
 type AppDelegate() =
