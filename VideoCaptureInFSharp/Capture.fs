@@ -91,6 +91,30 @@ module _Private =
         if error.Value <> null then Choice2Of2(error.Value.LocalizedDescription)
         else Choice1Of2(videoUrl, writer)
 
+    let initializeSession f =
+        //Create the capture session
+        let session = new AVCaptureSession(SessionPreset = AVCaptureSession.PresetMedium)
+
+        //Setup the video capture
+        let captureDevice = AVCaptureDevice.DefaultDeviceWithMediaType(!> AVMediaType.Video)
+        if captureDevice = null then
+            Choice2Of2("No captureDevice - this won't work on the simulator, try a physical device")
+        else
+            let input = AVCaptureDeviceInput.FromDevice(captureDevice)
+            if input = null then
+                Choice2Of2("No input - this won't work on the simulator, try a physical device")
+            else
+                session.AddInput(input)
+
+                // create a VideoDataOutput and add it to the sesion
+                let output = new AVCaptureVideoDataOutput(VideoSettings = new AVVideoSettings(CVPixelFormatType.CV32BGRA))
+
+                // configure the output
+                let queue = new MonoTouch.CoreFoundation.DispatchQueue("myQueue")
+                output.SetSampleBufferDelegate(f, queue)
+                session.AddOutput(output)
+                Choice1Of2(session)
+
     let startRecording
         (initSession : unit -> AVCaptureSession option) 
         (initWriter : unit -> AVAssetWriter option)
@@ -137,7 +161,7 @@ type VideoCapture(labelledView) =
     member x.StartRecording () =
         match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
         | Choice1Of2(r) -> x.recording <- Some(r); true
-        | Choice2Of2(m) -> x.recording <- None; Failure.Alert(m); false
+        | Choice2Of2(m) -> Failure.Alert(m); x.recording <- None; false
 
     member x.StopRecording () =
         match x.recording with
@@ -145,30 +169,9 @@ type VideoCapture(labelledView) =
         | None -> ()
 
     member x.InitializeSession () =
-        //Create the capture session
-        let session = new AVCaptureSession(SessionPreset = AVCaptureSession.PresetMedium)
-
-        //Setup the video capture
-        let captureDevice = AVCaptureDevice.DefaultDeviceWithMediaType(!> AVMediaType.Video)
-        if captureDevice = null then
-            Failure.Alert("No captureDevice - this won't work on the simulator, try a physical device")
-            None
-        else
-            let input = AVCaptureDeviceInput.FromDevice(captureDevice)
-            if input = null then
-                Failure.Alert("No input - this won't work on the simulator, try a physical device")
-                None
-            else
-                session.AddInput(input)
-
-                // create a VideoDataOutput and add it to the sesion
-                let output = new AVCaptureVideoDataOutput(VideoSettings = new AVVideoSettings(CVPixelFormatType.CV32BGRA))
-
-                // configure the output
-                let queue = new MonoTouch.CoreFoundation.DispatchQueue("myQueue")
-                output.SetSampleBufferDelegate(x, queue)
-                session.AddOutput(output)
-                Some(session)
+        match initializeSession x with
+        | Choice1Of2(s) -> Some(s)
+        | Choice2Of2(m) -> Failure.Alert(m); None
 
     member x.InitializeAssetWriter () =
         match initializeAssetWriter() with
