@@ -36,33 +36,33 @@ module _Private =
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
 
     let makeToggleButton (recordToggle : EventHandler) =
-        let toggleButton = UIButton.FromType (UIButtonType.RoundedRect)
-        toggleButton.SetTitle ("Record", UIControlState.Normal)
-        toggleButton.Frame <-
+        let tb = UIButton.FromType (UIButtonType.RoundedRect)
+        tb.SetTitle ("Record", UIControlState.Normal)
+        tb.Frame <-
             new RectangleF (
                 new PointF (
-                    UIScreen.MainScreen.Bounds.Width / 2.0f - toggleButton.IntrinsicContentSize.Width / 2.0f,
-                    UIScreen.MainScreen.Bounds.Height - toggleButton.IntrinsicContentSize.Height - 50.0f),
-                    toggleButton.IntrinsicContentSize)
-        toggleButton.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
-        toggleButton 
+                    UIScreen.MainScreen.Bounds.Width / 2.0f - tb.IntrinsicContentSize.Width / 2.0f,
+                    UIScreen.MainScreen.Bounds.Height - tb.IntrinsicContentSize.Height - 50.0f),
+                    tb.IntrinsicContentSize)
+        tb.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
+        tb 
 
     let imageFromSampleBuffer (sampleBuffer : CMSampleBuffer) =
         // Get the CoreVideo image
-        use pixelBuffer = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
+        use pb = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
         // Lock the base address
-        pixelBuffer.Lock(CVOptionFlags.None) |> ignore
+        pb.Lock(CVOptionFlags.None) |> ignore
         // Get the number of bytes per row for the pixel buffer
-        let baseAddress = pixelBuffer.BaseAddress
-        let bytesPerRow = pixelBuffer.BytesPerRow
-        let width = pixelBuffer.Width
-        let height = pixelBuffer.Height
+        let baseAddress = pb.BaseAddress
+        let bytesPerRow = pb.BytesPerRow
+        let width = pb.Width
+        let height = pb.Height
         let flags = CGBitmapFlags.PremultipliedFirst ||| CGBitmapFlags.ByteOrder32Little
         // Create a CGImage on the RGB colorspace from the configured parameter above
         use cs = CGColorSpace.CreateDeviceRGB()
         use context = new CGBitmapContext(baseAddress, width, height, 8, bytesPerRow, cs, flags)
         use cgImage = context.ToImage()
-        pixelBuffer.Unlock(CVOptionFlags.None) |> ignore
+        pb.Unlock(CVOptionFlags.None) |> ignore
         UIImage.FromImage(cgImage)
 
     let initializeInputWriter () =
@@ -223,7 +223,7 @@ type VideoCapture(labelledView) =
 type ContentView(fillColor, recordToggle : EventHandler) as x =
     inherit UIView()
 
-    let labelledView =
+    let lv =
         let imageBounds =
             new RectangleF (
                 10.0f,
@@ -238,13 +238,13 @@ type ContentView(fillColor, recordToggle : EventHandler) as x =
     do
         x.BackgroundColor <- fillColor
         [
-            labelledView.View :> UIView
-            labelledView.Label :> UIView
+            lv.View :> UIView
+            lv.Label :> UIView
             makeToggleButton (recordToggle) :> UIView
         ]
         |> List.iter (fun v -> x.AddSubview v)
 
-    member val LabelledView = labelledView
+    member val LabelledView = lv
 
 type VideoCapturing =
     {Capture : VideoCapture option; IsRecording : bool}
@@ -274,6 +274,7 @@ type VideoCaptureController(viewColor, title) =
             match base.View with
             | :? ContentView as cv -> (fun () -> cv.LabelledView)
             | _ -> failwith "Base class is not a ContentView"
+
         x.recordingCapture <- x.recordingCapture.Toggle getLabelledView
         let newTitle = if x.recordingCapture.IsRecording then "Stop" else "Record"
         (sender :?> UIButton).SetTitle(newTitle, UIControlState.Normal)
