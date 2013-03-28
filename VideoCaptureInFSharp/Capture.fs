@@ -262,10 +262,7 @@ type VideoCapturing =
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
 
-    let cv = base.View :?> ContentView
-    member val recordingCapture =
-        {Capture = Some(new VideoCapture(cv.LabelledView)); IsRecording = false}
-        with get, set
+    member val recordingCapture = {Capture = None; IsRecording = false} with get, set
 
     override x.ViewDidLoad() =
         base.ViewDidLoad()
@@ -273,9 +270,12 @@ type VideoCaptureController(viewColor, title) =
         x.View <- new ContentView(viewColor, (new EventHandler((fun o e -> x.RecordToggle(o, e)))))
 
     member x.RecordToggle (sender : obj, e : EventArgs) =
-        x.recordingCapture <- x.recordingCapture.Toggle cv.LabelledView
-        let newTitle = if x.recordingCapture.IsRecording then "Stop" else "Record"
-        (sender :?> UIButton).SetTitle(newTitle, UIControlState.Normal)
+        match base.View with
+        | :? ContentView as cv ->
+            x.recordingCapture <- x.recordingCapture.Toggle cv.LabelledView
+            let newTitle = if x.recordingCapture.IsRecording then "Stop" else "Record"
+            (sender :?> UIButton).SetTitle(newTitle, UIControlState.Normal)
+        | _ -> failwith "Base class is not a ContentView"
 
 [<Register("AppDelegate")>]
 type AppDelegate() =
