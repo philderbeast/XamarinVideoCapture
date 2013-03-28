@@ -68,9 +68,7 @@ module _Private =
                 let keys = [|AVVideo.CodecKey; AVVideo.WidthKey; AVVideo.HeightKey|] : NSObject []
                 NSDictionary.FromObjectsAndKeys(objects, keys)
 
-            let writerInput = new AVAssetWriterInput(!> AVMediaType.Video, dictionary)
-            writerInput.ExpectsMediaDataInRealTime <- true
-            Some(writerInput)
+            Some(new AVAssetWriterInput(!> AVMediaType.Video, dictionary, ExpectsMediaDataInRealTime = true))
         with
             | e -> Failure.Alert(e.Message); None
 
