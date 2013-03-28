@@ -246,12 +246,26 @@ type ContentView(fillColor, recordToggle : EventHandler) as x =
 
     member val LabelledView = labelledView
 
+type VideoCapturing =
+    {Capture : VideoCapture option; IsRecording : bool}
+    member x.Toggle lv =
+        match x with
+        | {Capture = Some(c); IsRecording = true} ->
+            c.StopRecording()
+            {x with IsRecording = false}
+        | {Capture = _; IsRecording = false} ->
+            let capture = new VideoCapture(lv)
+            {Capture = Some(capture); IsRecording = capture.StartRecording()}
+        | {Capture = None; IsRecording = true} ->
+            failwith "No capture but recording. How could that happen?"
+
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
 
     let cv = base.View :?> ContentView
-    member val recording = false with get, set
-    member val videoCapture : VideoCapture = new VideoCapture(cv.LabelledView) with get, set
+    member val recordingCapture =
+        {Capture = Some(new VideoCapture(cv.LabelledView)); IsRecording = false}
+        with get, set
 
     override x.ViewDidLoad() =
         base.ViewDidLoad()
@@ -259,14 +273,8 @@ type VideoCaptureController(viewColor, title) =
         x.View <- new ContentView(viewColor, (new EventHandler((fun o e -> x.RecordToggle(o, e)))))
 
     member x.RecordToggle (sender : obj, e : EventArgs) =
-        if not x.recording then
-            x.videoCapture <- new VideoCapture(cv.LabelledView)
-            x.recording <- x.videoCapture.StartRecording()
-        else
-            x.videoCapture.StopRecording()
-            x.recording <- false
-
-        let newTitle = if x.recording then "Stop" else "Record"
+        x.recordingCapture <- x.recordingCapture.Toggle cv.LabelledView
+        let newTitle = if x.recordingCapture.IsRecording then "Stop" else "Record"
         (sender :?> UIButton).SetTitle(newTitle, UIControlState.Normal)
 
 [<Register("AppDelegate")>]
