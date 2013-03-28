@@ -1,21 +1,15 @@
 ﻿namespace VideoCaptureInFSharp
 
 open System
-open System.Collections.Generic
-open System.Linq
-
+open System.Drawing
+open System.IO
 open MonoTouch.Foundation
 open MonoTouch.UIKit
 open MonoTouch.AVFoundation
 open MonoTouch.CoreMedia
-
-open System.Drawing
 open MonoTouch.CoreGraphics
-open MonoTouch.CoreAnimation
 open MonoTouch.CoreVideo
-open System.Threading
 open MonoTouch.AssetsLibrary
-open System.IO
 
 type Failure() =
     static member Alert (msg) =
