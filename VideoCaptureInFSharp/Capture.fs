@@ -218,14 +218,10 @@ type ContentView(fillColor, recordToggle : EventHandler) as x =
     inherit UIView()
 
     let lv =
-        let imageBounds =
-            new RectangleF (
-                10.0f,
-                10.0f,
-                UIScreen.MainScreen.Bounds.Width - 20.0f,
-                UIScreen.MainScreen.Bounds.Height - 120.0f)
+        let bds = UIScreen.MainScreen.Bounds
+        let imageBounds = new RectangleF (10.0f, 10.0f, bds.Width - 20.0f, bds.Height - 120.0f)
         {
-            Label = new UILabel (new RectangleF (UIScreen.MainScreen.Bounds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
+            Label = new UILabel (new RectangleF (bds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
             View = new UIImageView (imageBounds, BackgroundColor = UIColor.Blue)
         }
 
