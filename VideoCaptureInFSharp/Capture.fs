@@ -39,12 +39,14 @@ module _Private =
     let makeToggleButton (recordToggle : EventHandler) =
         let tb = UIButton.FromType (UIButtonType.RoundedRect)
         tb.SetTitle ("Record", UIControlState.Normal)
+        let bds = UIScreen.MainScreen.Bounds
+        let sz = tb.IntrinsicContentSize
         tb.Frame <-
             new RectangleF (
                 new PointF (
-                    UIScreen.MainScreen.Bounds.Width / 2.0f - tb.IntrinsicContentSize.Width / 2.0f,
-                    UIScreen.MainScreen.Bounds.Height - tb.IntrinsicContentSize.Height - 50.0f),
-                    tb.IntrinsicContentSize)
+                    bds.Width / 2.0f - sz.Width / 2.0f,
+                    bds.Height - sz.Height - 50.0f),
+                    sz)
         tb.TouchUpInside.Add (fun e -> recordToggle.Invoke(null, e))
         tb 
 
