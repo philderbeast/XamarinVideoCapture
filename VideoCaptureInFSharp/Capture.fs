@@ -119,8 +119,7 @@ module _Private =
         with
             | e -> Choice2Of2(e.Message)
 
-    let stopRecording recording onComplete =
-        match recording with
+    let stopRecording onComplete = function 
         | {Session = session; Writer = writer; InputWriter = _} ->
             session.StopRunning()
             writer.FinishWriting(new NSAction(onComplete))
@@ -142,7 +141,7 @@ type VideoCapture(labelledView) =
 
     member x.StopRecording () =
         match x.recording with
-        | Some(r) -> try stopRecording r (fun () -> x.MoveFinishedMovieToAlbum()) with | e -> Failure.Alert(e.Message)
+        | Some(r) -> try stopRecording (fun () -> x.MoveFinishedMovieToAlbum()) r with | e -> Failure.Alert(e.Message)
         | None -> ()
 
     member x.InitializeSession () =
