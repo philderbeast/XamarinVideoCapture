@@ -153,7 +153,6 @@ type VideoCapture(labelledView) =
     let frame = ref 0
 
     member val recording : Recording option = None with get, set
-    member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
 
     member x.StartRecording () =
         match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
@@ -188,12 +187,11 @@ type VideoCapture(labelledView) =
     member x.DidOutputSampleBuffer (captureOutput, sampleBuffer : CMSampleBuffer, connection) =
         try
             try
-                x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
-
+                let lastSampleTime = sampleBuffer.PresentationTimeStamp
                 match !frame, x.recording with
                 | 0, Some({Session = _; Writer = w; InputWriter = _}) ->
                     w.StartWriting() |> ignore
-                    w.StartSessionAtSourceTime(x.lastSampleTime)
+                    w.StartSessionAtSourceTime(lastSampleTime)
                     frame := 1
 
                 | _, Some({Session = _; Writer = _; InputWriter = iw}) ->
