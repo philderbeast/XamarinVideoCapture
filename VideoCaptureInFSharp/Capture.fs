@@ -150,9 +150,10 @@ type LabelledView = {Label : UILabel; View : UIImageView}
 type VideoCapture(labelledView) = 
     inherit AVCaptureVideoDataOutputSampleBufferDelegate()
 
+    let frame = ref 0
+
     member val recording : Recording option = None with get, set
     member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
-    member val frame = 0 with get, set
 
     member x.StartRecording () =
         match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
@@ -189,11 +190,12 @@ type VideoCapture(labelledView) =
             try
                 x.lastSampleTime <- sampleBuffer.PresentationTimeStamp
 
-                match x.frame, x.recording with
+                match !frame, x.recording with
                 | 0, Some({Session = _; Writer = w; InputWriter = _}) ->
                     w.StartWriting() |> ignore
                     w.StartSessionAtSourceTime(x.lastSampleTime)
-                    x.frame <- 1
+                    frame := 1
+
                 | _, Some({Session = _; Writer = _; InputWriter = iw}) ->
                     match labelledView with
                     | {Label = l; View = v} ->
@@ -205,7 +207,8 @@ type VideoCapture(labelledView) =
                                     if not (iw.AppendSampleBuffer(sampleBuffer)) then
                                         "Failed to append sample buffer"
                                     else
-                                        String.Format("{0} frames captured", (x.frame + 1))
+                                        frame := !frame + 1
+                                        String.Format("{0} frames captured", !frame)
                                 else
                                     "Writer not ready"
 
