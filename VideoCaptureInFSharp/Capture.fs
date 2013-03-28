@@ -52,15 +52,10 @@ module _Private =
         use pb = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
         // Lock the base address
         pb.Lock(CVOptionFlags.None) |> ignore
-        // Get the number of bytes per row for the pixel buffer
-        let baseAddress = pb.BaseAddress
-        let bytesPerRow = pb.BytesPerRow
-        let width = pb.Width
-        let height = pb.Height
         let flags = CGBitmapFlags.PremultipliedFirst ||| CGBitmapFlags.ByteOrder32Little
         // Create a CGImage on the RGB colorspace from the configured parameter above
         use cs = CGColorSpace.CreateDeviceRGB()
-        use context = new CGBitmapContext(baseAddress, width, height, 8, bytesPerRow, cs, flags)
+        use context = new CGBitmapContext(pb.BaseAddress, pb.Width, pb.Height, 8, pb.BytesPerRow, cs, flags)
         use cgImage = context.ToImage()
         pb.Unlock(CVOptionFlags.None) |> ignore
         UIImage.FromImage(cgImage)
