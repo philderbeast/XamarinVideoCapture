@@ -119,6 +119,12 @@ module _Private =
         with
             | e -> Choice2Of2(e.Message)
 
+    let stopRecording recording onComplete =
+        match recording with
+        | {Session = session; Writer = writer; InputWriter = _} ->
+            session.StopRunning()
+            writer.FinishWriting(new NSAction(onComplete))
+
 type LabelledView = {Label : UILabel; View : UIImageView}
 
 type VideoCapture(labelledView) = 
@@ -135,14 +141,9 @@ type VideoCapture(labelledView) =
         | Choice2Of2(m) -> x.recording <- None; Failure.Alert(m); false
 
     member x.StopRecording () =
-        try
-            match x.recording with
-            | Some({Session = session; Writer = writer; InputWriter = _}) ->
-                session.StopRunning()
-                writer.FinishWriting(new NSAction(fun () -> x.MoveFinishedMovieToAlbum()))
-            | _ -> ()
-        with
-            | e -> Failure.Alert(e.Message)
+        match x.recording with
+        | Some(r) -> try stopRecording r (fun () -> x.MoveFinishedMovieToAlbum()) with | e -> Failure.Alert(e.Message)
+        | None -> ()
 
     member x.InitializeSession () =
         //Create the capture session
