@@ -78,6 +78,19 @@ module _Private =
         with
             | e -> Failure.Alert(e.Message); None
 
+    let initializeAssetWriter () =
+        let filePath =
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "Temporary.mov")
+
+        if File.Exists(filePath) then File.Delete(filePath)
+        let videoUrl = NSUrl.FromFilename(filePath)
+        let error : Ref<NSError> = ref null
+        let writer = new AVAssetWriter(videoUrl, !> AVFileType.QuickTimeMovie, error)
+        if error.Value <> null then Choice2Of2(error.Value.LocalizedDescription)
+        else Choice1Of2(videoUrl, writer)
+
     let startRecording
         (initSession : unit -> AVCaptureSession option) 
         (initWriter : unit -> AVAssetWriter option)
@@ -113,7 +126,7 @@ type VideoCapture(labelledView) =
 
     member val recording : Recording option = None with get, set
     member val lastSampleTime : CMTime = CMTime(0L, 0) with get, set
-    member val videoUrl : NSUrl = null with get, set
+    member val videoUrl : NSUrl option = None with get, set
     member val frame = 0 with get, set
 
     member x.StartRecording () =
@@ -158,30 +171,19 @@ type VideoCapture(labelledView) =
                 Some(session)
 
     member x.InitializeAssetWriter () =
-        let filePath =
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "Temporary.mov")
-
-        if File.Exists(filePath) then File.Delete(filePath)
-        
-        x.videoUrl <- NSUrl.FromFilename(filePath)
-
-        let error : Ref<NSError> = ref null
-        let writer = new AVAssetWriter(x.videoUrl, !> AVFileType.QuickTimeMovie, error)
-        if error.Value <> null then
-            Failure.Alert(error.Value.LocalizedDescription)
-            None
-        else
-            Some(writer)
+        match initializeAssetWriter() with
+        | Choice1Of2(u, w) -> x.videoUrl <- Some(u); Some(w)
+        | Choice2Of2(m) -> Failure.Alert(m); x.videoUrl <- None; None
 
     member x.MoveFinishedMovieToAlbum () =
-        let lib = new ALAssetsLibrary()
-        lib.WriteVideoToSavedPhotosAlbum(
-            x.videoUrl,
-            new ALAssetsLibraryWriteCompletionDelegate((fun _ _ ->
-                labelledView.Label.BeginInvokeOnMainThread((fun () ->
-                    labelledView.Label.Text <- "Movie saved to Album.")))))
+        match x.videoUrl, labelledView with
+        | Some(url), {Label = l; View = _} ->
+            (new ALAssetsLibrary()).WriteVideoToSavedPhotosAlbum(
+                url,
+                new ALAssetsLibraryWriteCompletionDelegate((fun _ _ ->
+                    l.BeginInvokeOnMainThread((fun () ->
+                        l.Text <- "Movie saved to Album.")))))
+        | None, _ -> ()
 
     member x.DidOutputSampleBuffer (captureOutput, sampleBuffer : CMSampleBuffer, connection) =
         try
