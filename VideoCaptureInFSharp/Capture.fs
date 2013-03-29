@@ -11,12 +11,6 @@ open MonoTouch.CoreGraphics
 open MonoTouch.CoreVideo
 open MonoTouch.AssetsLibrary
 
-type Failure() =
-    static member Alert (msg) =
-        let obj = new NSString() :> NSObject
-        let alert = new UIAlertView("Trouble", msg, null, "OK", null)
-        new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
-
 type Recording =
     {
         VideoUrl : NSUrl
@@ -29,6 +23,11 @@ type Recording =
 module private __ =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
+
+    let alert msg =
+        let obj = new NSString() :> NSObject
+        let alert = new UIAlertView("Trouble", msg, null, "OK", null)
+        new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
 
     let makeToggleButton recordToggle =
         let tb = UIButton.FromType (UIButtonType.RoundedRect)
@@ -66,7 +65,7 @@ module private __ =
 
             Some(new AVAssetWriterInput(!> AVMediaType.Video, dictionary, ExpectsMediaDataInRealTime = true))
         with
-            | e -> Failure.Alert(e.Message); None
+            | e -> alert(e.Message); None
 
     let initializeAssetWriter () =
         let filePath =
@@ -148,22 +147,22 @@ type VideoCapture(labelledView) =
     member x.StartRecording () =
         match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
         | Choice1Of2(r) -> x.recording <- Some(r); true
-        | Choice2Of2(m) -> Failure.Alert(m); x.recording <- None; false
+        | Choice2Of2(m) -> alert(m); x.recording <- None; false
 
     member x.StopRecording () =
         match x.recording with
-        | Some(r) -> try stopRecording (fun () -> x.MoveFinishedMovieToAlbum()) r with | e -> Failure.Alert(e.Message)
+        | Some(r) -> try stopRecording (fun () -> x.MoveFinishedMovieToAlbum()) r with | e -> alert(e.Message)
         | None -> ()
 
     member x.InitializeSession () =
         match initializeSession x with
         | Choice1Of2(s) -> Some(s)
-        | Choice2Of2(m) -> Failure.Alert(m); None
+        | Choice2Of2(m) -> alert(m); None
 
     member x.InitializeAssetWriter () =
         match initializeAssetWriter() with
         | Choice1Of2(u, w) -> Some(u, w)
-        | Choice2Of2(m) -> Failure.Alert(m); None
+        | Choice2Of2(m) -> alert(m); None
 
     member x.MoveFinishedMovieToAlbum () =
         match x.recording, labelledView with
@@ -204,7 +203,7 @@ type VideoCapture(labelledView) =
                             l.Text <- infoString)
                 | _ -> ()
             with
-                | e -> Failure.Alert(e.Message)
+                | e -> alert(e.Message)
         finally
             sampleBuffer.Dispose()
 
