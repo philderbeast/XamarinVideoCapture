@@ -26,7 +26,7 @@ type Recording =
     }
 
 [<AutoOpen>]
-module _Private =
+module private __ =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
 
