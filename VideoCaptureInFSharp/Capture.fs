@@ -220,19 +220,17 @@ type ContentView(fillColor, recordToggle) as x =
 
     member val LabelledView = lv
 
-type VideoCapturing =
-    {Capture : VideoCapture option}
-    member x.IsRecording with get () = x.Capture.IsSome
-    member x.Toggle lv =
-        match x with
-        | {Capture = Some(c)} -> c.StopRecording(); {Capture = None}
-        | {Capture = None} ->
-            let capture = new VideoCapture(lv())
-            {Capture = if capture.StartRecording() then Some(capture) else None}
-
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
-    member val recordingCapture = {Capture = None} with get, set
+
+    let capture : Ref<VideoCapture option> = ref None
+
+    let toggle lv (capture : VideoCapture option) =
+        match capture with
+        | Some(c) -> c.StopRecording(); None
+        | None ->
+            let vc = new VideoCapture(lv())
+            if vc.StartRecording() then Some(vc) else None
 
     override x.ViewDidLoad() =
         base.ViewDidLoad()
@@ -245,8 +243,9 @@ type VideoCaptureController(viewColor, title) =
             | :? ContentView as cv -> fun () -> cv.LabelledView
             | _ -> failwith "Base class is not a ContentView"
 
-        x.recordingCapture <- x.recordingCapture.Toggle getLabelledView
-        titleSetter <| if x.recordingCapture.IsRecording then "Stop" else "Record"
+        toggle getLabelledView !capture
+        |> (function | None -> None, "Start" | Some(c) as vc -> vc, "Stop")
+        |> fun (state, nextAction) -> capture := state; nextAction |> titleSetter
 
 [<Register("AppDelegate")>]
 type AppDelegate() =
