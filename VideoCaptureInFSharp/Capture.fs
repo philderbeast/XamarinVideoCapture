@@ -34,7 +34,7 @@ module private __ =
         tb.SetTitle ("Record", UIControlState.Normal)
         let bds = UIScreen.MainScreen.Bounds
         let sz = tb.IntrinsicContentSize
-        let pt = new PointF (bds.Width / 2.0f - sz.Width / 2.0f, bds.Height - sz.Height - 50.0f)
+        let pt = new PointF ((bds.Width - sz.Width) / 2.0f, bds.Height - sz.Height - 50.0f)
         tb.Frame <- new RectangleF (pt, sz)
         tb.TouchUpInside.Add (fun _ -> recordToggle tb)
         tb 
