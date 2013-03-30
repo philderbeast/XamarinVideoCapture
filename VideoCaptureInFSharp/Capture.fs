@@ -23,11 +23,9 @@ type Recording =
 module private __ =
     // SEE: http://stackoverflow.com/questions/10719770/is-there-anyway-to-use-c-sharp-implicit-operators-from-f
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
-
     let alert msg =
         NSAction(fun () -> (new UIAlertView("Trouble", msg, null, "OK", null)).Show())
         |> (new NSString() :> NSObject).InvokeOnMainThread
-
     let makeToggleButton recordToggle =
         let tb = UIButton.FromType (UIButtonType.RoundedRect)
         tb.SetTitle ("Record", UIControlState.Normal)
@@ -37,7 +35,6 @@ module private __ =
         tb.Frame <- RectangleF (pt, sz)
         tb.TouchUpInside.Add (fun _ -> recordToggle tb)
         tb 
-
     let imageFromSampleBuffer (sampleBuffer : CMSampleBuffer) =
         // Get the CoreVideo image
         use pb = sampleBuffer.GetImageBuffer() :?> CVPixelBuffer
@@ -50,35 +47,25 @@ module private __ =
         use cgImage = context.ToImage()
         pb.Unlock(CVOptionFlags.None) |> ignore
         UIImage.FromImage(cgImage)
-
     let initializeInputWriter () =
         try
             let dictionary =
                 let objects = [|AVVideo.CodecH264; new NSNumber(640); new NSNumber(480)|] : NSObject []
                 let keys = [|AVVideo.CodecKey; AVVideo.WidthKey; AVVideo.HeightKey|] : NSObject []
                 NSDictionary.FromObjectsAndKeys(objects, keys)
-
             Some(new AVAssetWriterInput(!> AVMediaType.Video, dictionary, ExpectsMediaDataInRealTime = true))
-        with
-            | e -> alert(e.Message); None
-
+        with | e -> alert(e.Message); None
     let initializeAssetWriter () =
-        let filePath =
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "Temporary.mov")
-
+        let filePath = Path.Combine( Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Temporary.mov")
         if File.Exists(filePath) then File.Delete(filePath)
         let videoUrl = NSUrl.FromFilename(filePath)
         let error : Ref<NSError> = ref null
         let writer = new AVAssetWriter(videoUrl, !> AVFileType.QuickTimeMovie, error)
         if error.Value <> null then Choice2Of2(error.Value.LocalizedDescription)
         else Choice1Of2(videoUrl, writer)
-
     let initializeSession f =
         //Create the capture session
         let session = new AVCaptureSession(SessionPreset = AVCaptureSession.PresetMedium)
-
         //Setup the video capture
         match AVCaptureDevice.DefaultDeviceWithMediaType(!> AVMediaType.Video) with
         | captureDevice when captureDevice <> null ->
@@ -87,17 +74,14 @@ module private __ =
                 Choice2Of2("No input - this won't work on the simulator, try a physical device")
             else
                 session.AddInput(input)
-
                 // create a VideoDataOutput and add it to the sesion
                 let output = new AVCaptureVideoDataOutput(VideoSettings = AVVideoSettings(CVPixelFormatType.CV32BGRA))
-
                 // configure the output
                 let queue = new MonoTouch.CoreFoundation.DispatchQueue("myQueue")
                 output.SetSampleBufferDelegate(f, queue)
                 session.AddOutput(output)
                 Choice1Of2(session)
         | _ -> Choice2Of2("No captureDevice - this won't work on the simulator, try a physical device")
-
     let startRecording
         (initSession : unit -> AVCaptureSession option) 
         (initWriter : unit -> (NSUrl * AVAssetWriter) option)
@@ -124,9 +108,7 @@ module private __ =
                                     Writer = writer
                                     InputWriter = inputWriter
                                 })
-        with
-            | e -> Choice2Of2(e.Message)
-
+        with | e -> Choice2Of2(e.Message)
     let stopRecording onComplete = function 
         | {Session = session; Writer = writer; InputWriter = _} ->
             session.StopRunning()
@@ -138,27 +120,22 @@ type VideoCapture(labelledView) =
     inherit AVCaptureVideoDataOutputSampleBufferDelegate()
     let frame = ref 0
     member val recording : Recording option = None with get, set
-
     member x.StartRecording () =
         match startRecording (x.InitializeSession) (x.InitializeAssetWriter) initializeInputWriter with
         | Choice1Of2(r) -> x.recording <- Some(r); true
         | Choice2Of2(m) -> alert(m); x.recording <- None; false
-
     member x.StopRecording () =
         match x.recording with
         | Some(r) -> try stopRecording (fun () -> x.MoveFinishedMovieToAlbum()) r with | e -> alert(e.Message)
         | None -> ()
-
     member x.InitializeSession () =
         match initializeSession x with
         | Choice1Of2(s) -> Some(s)
         | Choice2Of2(m) -> alert(m); None
-
     member x.InitializeAssetWriter () =
         match initializeAssetWriter() with
         | Choice1Of2(u, w) -> Some(u, w)
         | Choice2Of2(m) -> alert(m); None
-
     member x.MoveFinishedMovieToAlbum () =
         match x.recording, labelledView with
         | Some({VideoUrl = url; Session = _; Writer = _; InputWriter = _}), {Label = l; View = _} ->
@@ -168,7 +145,6 @@ type VideoCapture(labelledView) =
                     l.BeginInvokeOnMainThread(fun () ->
                         l.Text <- "Movie saved to Album.")))
         | None, _ -> ()
-
     member x.DidOutputSampleBuffer (captureOutput, sampleBuffer : CMSampleBuffer, connection) =
         try
             try
@@ -197,14 +173,11 @@ type VideoCapture(labelledView) =
 
                             l.Text <- infoString)
                 | _ -> ()
-            with
-                | e -> alert(e.Message)
-        finally
-            sampleBuffer.Dispose()
+            with | e -> alert(e.Message)
+        finally sampleBuffer.Dispose()
 
 type ContentView(fillColor, recordToggle) as x =
     inherit UIView()
-
     let lv =
         let bds = UIScreen.MainScreen.Bounds
         let imageBounds = RectangleF (10.0f, 10.0f, bds.Width - 20.0f, bds.Height - 120.0f)
@@ -212,37 +185,30 @@ type ContentView(fillColor, recordToggle) as x =
             Label = new UILabel (RectangleF (bds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
             View = new UIImageView (imageBounds, BackgroundColor = UIColor.Blue)
         }
-
     do
         x.BackgroundColor <- fillColor
         ([lv.View; lv.Label; makeToggleButton recordToggle] : UIView list)
         |> List.iter (fun v -> x.AddSubview v)
-
     member val LabelledView = lv
 
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
-
     let capture : Ref<VideoCapture option> = ref None
-
     let toggle lv (capture : VideoCapture option) =
         match capture with
         | Some(c) -> c.StopRecording(); None
         | None ->
             let vc = new VideoCapture(lv())
             if vc.StartRecording() then Some(vc) else None
-
     override x.ViewDidLoad() =
         base.ViewDidLoad()
         x.Title <- title
         x.View <- new ContentView(viewColor, fun uib -> x.RecordToggle(fun s -> uib.SetTitle(s, UIControlState.Normal)))
-
     member x.RecordToggle (titleSetter : string -> unit) =
         let getLabelledView =
             match base.View with
             | :? ContentView as cv -> fun () -> cv.LabelledView
             | _ -> failwith "Base class is not a ContentView"
-
         toggle getLabelledView !capture
         |> (function | None -> None, "Start" | Some(c) as vc -> vc, "Stop")
         |> fun (state, nextAction) -> capture := state; nextAction |> titleSetter
