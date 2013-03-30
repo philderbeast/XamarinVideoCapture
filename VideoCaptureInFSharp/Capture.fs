@@ -25,17 +25,16 @@ module private __ =
     let inline (!>) (x:^a) : ^b = ((^a or ^b) : (static member op_Implicit : ^a -> ^b) x) 
 
     let alert msg =
-        let obj = new NSString() :> NSObject
-        let alert = new UIAlertView("Trouble", msg, null, "OK", null)
-        new NSAction(fun () -> alert.Show()) |> obj.InvokeOnMainThread
+        NSAction(fun () -> (new UIAlertView("Trouble", msg, null, "OK", null)).Show())
+        |> (new NSString() :> NSObject).InvokeOnMainThread
 
     let makeToggleButton recordToggle =
         let tb = UIButton.FromType (UIButtonType.RoundedRect)
         tb.SetTitle ("Record", UIControlState.Normal)
         let bds = UIScreen.MainScreen.Bounds
         let sz = tb.IntrinsicContentSize
-        let pt = new PointF ((bds.Width - sz.Width) / 2.0f, bds.Height - sz.Height - 50.0f)
-        tb.Frame <- new RectangleF (pt, sz)
+        let pt = PointF ((bds.Width - sz.Width) / 2.0f, bds.Height - sz.Height - 50.0f)
+        tb.Frame <- RectangleF (pt, sz)
         tb.TouchUpInside.Add (fun _ -> recordToggle tb)
         tb 
 
@@ -90,7 +89,7 @@ module private __ =
                 session.AddInput(input)
 
                 // create a VideoDataOutput and add it to the sesion
-                let output = new AVCaptureVideoDataOutput(VideoSettings = new AVVideoSettings(CVPixelFormatType.CV32BGRA))
+                let output = new AVCaptureVideoDataOutput(VideoSettings = AVVideoSettings(CVPixelFormatType.CV32BGRA))
 
                 // configure the output
                 let queue = new MonoTouch.CoreFoundation.DispatchQueue("myQueue")
@@ -165,7 +164,7 @@ type VideoCapture(labelledView) =
         | Some({VideoUrl = url; Session = _; Writer = _; InputWriter = _}), {Label = l; View = _} ->
             (new ALAssetsLibrary()).WriteVideoToSavedPhotosAlbum(
                 url,
-                new ALAssetsLibraryWriteCompletionDelegate(fun _ _ ->
+                ALAssetsLibraryWriteCompletionDelegate(fun _ _ ->
                     l.BeginInvokeOnMainThread(fun () ->
                         l.Text <- "Movie saved to Album.")))
         | None, _ -> ()
@@ -208,9 +207,9 @@ type ContentView(fillColor, recordToggle) as x =
 
     let lv =
         let bds = UIScreen.MainScreen.Bounds
-        let imageBounds = new RectangleF (10.0f, 10.0f, bds.Width - 20.0f, bds.Height - 120.0f)
+        let imageBounds = RectangleF (10.0f, 10.0f, bds.Width - 20.0f, bds.Height - 120.0f)
         {
-            Label = new UILabel (new RectangleF (bds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
+            Label = new UILabel (RectangleF (bds.Width - 150.0f, 10.0f, 140.0f, 50.0f))
             View = new UIImageView (imageBounds, BackgroundColor = UIColor.Blue)
         }
 
