@@ -221,21 +221,18 @@ type ContentView(fillColor, recordToggle) as x =
     member val LabelledView = lv
 
 type VideoCapturing =
-    {Capture : VideoCapture option; IsRecording : bool}
+    {Capture : VideoCapture option}
+    member x.IsRecording with get () = x.Capture.IsSome
     member x.Toggle lv =
         match x with
-        | {Capture = Some(c); IsRecording = true} ->
-            c.StopRecording()
-            {x with IsRecording = false}
-        | {Capture = _; IsRecording = false} ->
+        | {Capture = Some(c)} -> c.StopRecording(); {Capture = None}
+        | {Capture = None} ->
             let capture = new VideoCapture(lv())
-            {Capture = Some(capture); IsRecording = capture.StartRecording()}
-        | {Capture = None; IsRecording = true} ->
-            failwith "No capture but recording. How could that happen?"
+            {Capture = if capture.StartRecording() then Some(capture) else None}
 
 type VideoCaptureController(viewColor, title) =
     inherit UIViewController()
-    member val recordingCapture = {Capture = None; IsRecording = false} with get, set
+    member val recordingCapture = {Capture = None} with get, set
 
     override x.ViewDidLoad() =
         base.ViewDidLoad()
